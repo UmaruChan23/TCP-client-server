@@ -1,4 +1,4 @@
-import java.io.OutputStream
+import java.io.*
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.Charset
@@ -18,8 +18,8 @@ fun main() {
 }
 
 class ClientHandler(private val client: Socket) {
-    private val reader: Scanner = Scanner(client.getInputStream())
-    private val writer: OutputStream = client.getOutputStream()
+    private val reader: BufferedReader = BufferedReader(InputStreamReader(client.getInputStream()))
+    private val writer: BufferedWriter = BufferedWriter(OutputStreamWriter(client.getOutputStream()))
     private var running: Boolean = false
 
     fun run() {
@@ -27,12 +27,12 @@ class ClientHandler(private val client: Socket) {
 
         while (running) {
             try {
-                val text = reader.nextLine()
+                val text = reader.readLine()
                 if (text == "EXIT") {
                     shutdown()
                     continue
                 }
-                write(text)
+                write(text + "\n")
             } catch (ex: Exception) {
                 shutdown()
             }
@@ -41,12 +41,15 @@ class ClientHandler(private val client: Socket) {
     }
 
     private fun write(message: String) {
-        writer.write(message.toByteArray(Charset.defaultCharset()))
+        writer.write(message)
+        writer.flush()
     }
 
     private fun shutdown() {
         running = false
         client.close()
+        reader.close()
+        writer.close()
         println("${client.inetAddress.hostAddress} closed the connection")
     }
 
