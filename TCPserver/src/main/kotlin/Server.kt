@@ -1,21 +1,28 @@
 import java.io.*
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.*
 
 import kotlin.concurrent.thread
 import kotlin.experimental.xor
 
+    fun main() {
+        val server = ServerSocket(9999)
+        println("Server running on port ${server.localPort}")
 
-fun main() {
-    val server = ServerSocket(9999)
-    println("Server running on port ${server.localPort}")
+        while (true) {
+            val client = server.accept()
 
-    while (true) {
-        val client = server.accept()
-        println("Client connected : ${client.inetAddress.hostAddress}")
+            val tempClient = ClientHandler(client)
+            ServerList.serverList.add(tempClient)
+            println("Client connected : ${client.inetAddress.hostAddress}")
 
-        thread { ClientHandler(client).run() }
+            thread { tempClient.run() }
+        }
     }
+
+object ServerList {
+    val serverList: LinkedList<ClientHandler> = LinkedList()
 }
 
 class ClientHandler(private val client: Socket) {
@@ -41,7 +48,12 @@ class ClientHandler(private val client: Socket) {
                     shutdown()
                     continue
                 }
-                write(text)
+
+                for(cl in ServerList.serverList)
+                {
+                    cl.write(text)
+                }
+
             } catch (ex: Exception) {
                 shutdown()
             }

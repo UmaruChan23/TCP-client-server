@@ -1,15 +1,17 @@
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.Socket
+import kotlin.concurrent.thread
 import kotlin.experimental.xor
 
 fun main() {
+
     val client = Socket("127.0.0.1", 9999)
+
     val sin = client.getInputStream()
     val out = client.getOutputStream()
     val reader = DataInputStream(sin)
     val writer = DataOutputStream(out)
-
     val keyHandler = DH()
 
     val p = reader.readUTF()
@@ -23,47 +25,67 @@ fun main() {
     keyHandler.checkControlSum()
 
     try {
-
-        val text = readLine().toString()
-
-        val massage = encode(text, keyHandler.getKey())
-
-        writer.writeInt(massage.size)
-        writer.write(massage)
-        writer.flush()
-
-        var buffer = ByteArray(reader.readInt())
-        reader.read(buffer)
-
-        val ans = decode(buffer, keyHandler.getKey())
-        println(ans)
+        thread { ReadAllMsg(reader, keyHandler).run() }
+        thread { WriteAllMsg(writer, keyHandler, client).run() }
     } catch (ex: Exception) {
+        println("ex")
         client.close()
-    } finally {
-        println("Client close...");
-        client.close();
     }
-
-    client.close()
 }
 
 
-fun encode(pText: String, pKey: String): ByteArray {
-    val txt = pText.toByteArray()
-    val key = pKey.toByteArray()
-    val res = ByteArray(pText.length)
-    for (i in txt.indices) {
-        res[i] = (txt[i] xor key[i % key.size])
+class ReadAllMsg(private val reader: DataInputStream, private val keyHandler: DH) {
+
+    fun run() {
+        try {
+            while (true) {
+                val buffer = ByteArray(reader.readInt())
+                reader.read(buffer)
+                val msg = decode(buffer, keyHandler.getKey())
+                println(msg)
+            }
+        } catch (ex: Exception) {
+        }
     }
-    return res
+
+    fun decode(pText: ByteArray, pKey: String): String {
+        val res = ByteArray(pText.size)
+        val key = pKey.toByteArray()
+        for (i in pText.indices) {
+            res[i] = (pText[i] xor key[i % key.size])
+        }
+        return String(res)
+    }
 }
 
+class WriteAllMsg(private val writer: DataOutputStream, private val keyHandler: DH, private val client: Socket) {
 
-fun decode(pText: ByteArray, pKey: String): String {
-    val res = ByteArray(pText.size)
-    val key = pKey.toByteArray()
-    for (i in pText.indices) {
-        res[i] = (pText[i] xor key[i % key.size])
+    fun run() {
+        try {
+            while (true) {
+                val text = readLine().toString()
+
+                if(text.equals("exit")){
+                    client.close()
+                }
+
+                val massage = encode(text, keyHandler.getKey())
+
+                writer.writeInt(massage.size)
+                writer.write(massage)
+                writer.flush()
+            }
+        } catch (ex: Exception) {
+        }
     }
-    return String(res)
+
+    fun encode(pText: String, pKey: String): ByteArray {
+        val txt = pText.toByteArray()
+        val key = pKey.toByteArray()
+        val res = ByteArray(pText.length)
+        for (i in txt.indices) {
+            res[i] = (txt[i] xor key[i % key.size])
+        }
+        return res
+    }
 }
